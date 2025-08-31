@@ -42,15 +42,15 @@ void handle_session(tcp::socket socket) {
 int main() {
     // TODO: add fixing, payment date and direction
     // TODO: think about a way to handle greeks
-    pricing::PricingEngine engine;
+    const pricing::PricingEngine engine;
     pricing::MarketData market(100.0, 0.20, 0.2);
     std::cout << "Hello" << std::endl;
+
+    auto euroCall = std::make_unique<pricing::EuropeanVanillaCall>(110.0);
+    pricing::Option option(std::move(euroCall), 1.0);
     //
-    // auto euroCall = std::make_unique<pricing::EuropeanVanillaCall>(110.0);
-    // pricing::Option option(std::move(euroCall), 1.0);
-    //
-    // auto result = engine.price(option, market, pricing::ModelType::BLACK_SCHOLES);
-    // std::cout << result.getPrice() << std::endl;
+    auto result = engine.price(option, market, pricing::ModelType::BLACK_SCHOLES);
+    std::cout << result.getPrice() << std::endl;
 
     return 0;
     // std::cout << "Hello, World!" << std::endl;

@@ -15,9 +15,14 @@ file(GLOB_RECURSE SOURCES CONFIGURE_DEPENDS
         src/*.cpp
 )
 
-# Add main.cpp separately
+# Collect main sources (from main directory)
+file(GLOB_RECURSE MAIN_SOURCES CONFIGURE_DEPENDS
+        main/*.cpp
+)
+
+# Add all sources
 add_executable(hiram_pricing_engine
-        main.cpp
+        ${MAIN_SOURCES}
         ${SOURCES}
 )
 
