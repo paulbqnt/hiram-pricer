@@ -6,11 +6,6 @@
 #include <string>
 #include <nlohmann/json.hpp>
 
-#include "core/pricing/pricing_model.hpp"
-
-// #include "core/instruments/base/option.hpp"
-// #include "core/payoffs/concrete_payoffs.hpp"
-// #include "core/pricing/pricing_engine.hpp"
 #include "core/instruments/base/option.hpp"
 #include "core/payoffs/concrete_payoffs.hpp"
 #include "core/pricing/pricing_engine.hpp"
@@ -49,12 +44,13 @@ int main() {
     // TODO: think about a way to handle greeks
     pricing::PricingEngine engine;
     pricing::MarketData market(100.0, 0.20, 0.2);
-
-    auto euroCall = std::make_unique<pricing::EuropeanVanillaCall>(110.0);
-    pricing::Option option(std::move(euroCall), 1.0);
-
-    auto result = engine.price(option, market, pricing::ModelType::BLACK_SCHOLES);
-    std::cout << result.getPrice() << std::endl;
+    std::cout << "Hello" << std::endl;
+    //
+    // auto euroCall = std::make_unique<pricing::EuropeanVanillaCall>(110.0);
+    // pricing::Option option(std::move(euroCall), 1.0);
+    //
+    // auto result = engine.price(option, market, pricing::ModelType::BLACK_SCHOLES);
+    // std::cout << result.getPrice() << std::endl;
 
     return 0;
     // std::cout << "Hello, World!" << std::endl;
