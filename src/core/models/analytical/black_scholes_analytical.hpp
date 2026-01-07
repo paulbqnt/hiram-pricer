@@ -1,11 +1,11 @@
 #pragma once
 #include <cmath>
 
-#include "../../pricing/pricing_model.hpp"
+#include "../../pricing/pricing_implementation.hpp"
 
-class BlackScholesModel : public pricing::PricingModel {
+class BlackScholesAnalytical : public pricing::PricingImplementation {
 public:
-    BlackScholesModel() = default;
+    BlackScholesAnalytical() = default;
 
     pricing::PricingResult price(const pricing::Option& option, const pricing::MarketData& marketData) override;
     std::string getName() const override { return "Black-Scholes"; }

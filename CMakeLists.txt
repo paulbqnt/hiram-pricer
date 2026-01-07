@@ -21,20 +21,26 @@ file(GLOB_RECURSE MAIN_SOURCES CONFIGURE_DEPENDS
 )
 
 # Add all sources
-add_executable(hiram_pricing_engine
+add_executable(hiram_pricer
         ${MAIN_SOURCES}
         ${SOURCES}
+        src/main.cpp
+        src/core/pricing/pricing_engine.cpp
+        src/core/pricing/pricing_result.cpp
+        src/core/models/analytical/black_scholes_analytical.cpp
+        src/core/enums/model_method_pair.cpp
+        src/core/enums/model_method_pair.cpp  # ADD THIS LINE
 )
 
 # Include directories
-target_include_directories(hiram_pricing_engine
+target_include_directories(hiram_pricer
         PRIVATE
         ${Boost_INCLUDE_DIRS}
         ${CMAKE_SOURCE_DIR}/src
 )
 
 # Link libraries
-target_link_libraries(hiram_pricing_engine
+target_link_libraries(hiram_pricer
         PRIVATE
         ${Boost_LIBRARIES}
         nlohmann_json::nlohmann_json

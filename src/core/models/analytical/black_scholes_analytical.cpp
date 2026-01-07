@@ -1,11 +1,11 @@
 #include "../../market_data/market_data.hpp"
-#include "black_scholes.hpp"
+#include "black_scholes_analytical.hpp"
 #include "../../instruments/base/option.hpp"
 #include "../../pricing/pricing_result.hpp"
 #include <cmath>
 #include <stdexcept>
 
-pricing::PricingResult BlackScholesModel::price(const pricing::Option& option, const pricing::MarketData& marketData) {
+pricing::PricingResult BlackScholesAnalytical::price(const pricing::Option& option, const pricing::MarketData& marketData) {
     try {
         double S = marketData.getSpotPrice();
         double K = option.getStrike();
@@ -38,27 +38,27 @@ pricing::PricingResult BlackScholesModel::price(const pricing::Option& option, c
     }
 }
 
-double BlackScholesModel::calculateCallPrice(double S, double K, double T, double r, double sigma) const {
+double BlackScholesAnalytical::calculateCallPrice(double S, double K, double T, double r, double sigma) const {
     double d1 = calculateD1(S, K, T, r, sigma);
     double d2 = calculateD2(S, K, T, r, sigma);
     return S * normalCDF(d1) - K * std::exp(-r * T) * normalCDF(d2);
 }
 
 // *** FIXED: This was completely wrong ***
-double BlackScholesModel::calculatePutPrice(double S, double K, double T, double r, double sigma) const {
+double BlackScholesAnalytical::calculatePutPrice(double S, double K, double T, double r, double sigma) const {
     double d1 = calculateD1(S, K, T, r, sigma);
     double d2 = calculateD2(S, K, T, r, sigma);
     return K * std::exp(-r * T) * normalCDF(-d2) - S * normalCDF(-d1);
 }
 
-double BlackScholesModel::normalCDF(double x) const {
+double BlackScholesAnalytical::normalCDF(double x) const {
     return 0.5 * (1.0 + std::erf(x / std::sqrt(2.0)));
 }
 
-double BlackScholesModel::calculateD1(double S, double K, double T, double r, double sigma) const {
+double BlackScholesAnalytical::calculateD1(double S, double K, double T, double r, double sigma) const {
     return (std::log(S / K) + (r + 0.5 * sigma * sigma) * T) / (sigma * std::sqrt(T));
 }
 
-double BlackScholesModel::calculateD2(double S, double K, double T, double r, double sigma) const {
+double BlackScholesAnalytical::calculateD2(double S, double K, double T, double r, double sigma) const {
     return calculateD1(S, K, T, r, sigma) - sigma * std::sqrt(T);
 }

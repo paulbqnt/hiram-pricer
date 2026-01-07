@@ -41,34 +41,42 @@ void handle_session(tcp::socket socket) {
 
 int main() {
     // TODO: add fixing, payment date and direction
-    // TODO: think about a way to handle greeks
+
+
     const pricing::PricingEngine engine;
-    pricing::MarketData market(100.0, 0.20, 0.2);
-    std::cout << "Hello" << std::endl;
+    pricing::MarketData market(100.0, 0.20, 0.05);
 
     auto euroCall = std::make_unique<pricing::EuropeanVanillaCall>(110.0);
-    pricing::Option option(std::move(euroCall), 1.0);
-    //
-    auto result = engine.price(option, market, pricing::ModelType::BLACK_SCHOLES);
-    std::cout << result.getPrice() << std::endl;
+    pricing::Option callOption(std::move(euroCall), 1.0);
+
+    auto start = std::chrono::high_resolution_clock::now();
+
+    auto result = engine.price(
+        callOption,
+        market,
+        pricing::PricingModel::BLACK_SCHOLES,
+        pricing::NumericalMethod::ANALYTICAL);
+
+    auto end = std::chrono::high_resolution_clock::now();
+
+    auto duration =
+        std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+
+    std::cout << "Pricing took: " << duration.count() << " ns\n";
+
+    if (!result.hasError()) {
+        std::cout << "\nEuropean Call Price: $" << result.getPrice() << std::endl;
+        std::cout << "Method: " << result.toString() << std::endl;
+    } else {
+        std::cout << "\nError: " << result.getErrorMessage() << std::endl;
+    }
+
+    // 2. Query compatible combinations
+    std::cout << "\nCompatible pricing methods:" << std::endl;
+    auto compatible = engine.getCompatibleCombinations(callOption);
+    for (const auto& pair : compatible) {
+        std::cout << "  - " << pricing::toString(pair) << std::endl;
+    }
 
     return 0;
-    // std::cout << "Hello, World!" << std::endl;
-    // try {
-    //     const auto address = net::ip::make_address("0.0.0.0");
-    //     const unsigned short port = 8080;
-    //
-    //     net::io_context ioc;
-    //
-    //     tcp::acceptor acceptor{ioc, {address, port}};
-    //
-    //     for (;;) {
-    //         tcp::socket socket{ioc};
-    //         acceptor.accept(socket);
-    //         handle_session(std::move(socket));
-    //     }
-    // } catch (const std::exception &e) {
-    //     std::cerr << "Error: " << e.what() << "\n";
-    //     return EXIT_FAILURE;
-    // }
 }

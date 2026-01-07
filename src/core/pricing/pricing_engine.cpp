@@ -1,140 +1,121 @@
 #include "pricing_engine.hpp"
 #include "../instruments/base/option.hpp"
-#include "../models/analytical/black_scholes.hpp"
+#include "../models/analytical/black_scholes_analytical.hpp"
 #include <vector>
 #include <functional>
 #include <stdexcept>
 
 namespace pricing {
-    PricingEngine::PricingEngine() {
-        registerDefaultModels();
-    }
-
     // *** PRIMARY METHOD: ModelType enum ***
-    PricingResult PricingEngine::price(const Option& option, const MarketData& marketData, ModelType modelType) const {
-        // Check if payoff accepts this model type
-        if (!option.getPayoff().acceptModel(modelType)) {
-            auto compatibleTypes = getCompatibleModelTypes(option);
+    PricingEngine::PricingEngine() {
+        registerDefaultImplementations();
+    }
 
-            std::string error = "Model '" + modelTypeToString(modelType) +
-                               "' cannot price " + option.getType() + ". Compatible models: ";
+    PricingResult PricingEngine::price(
+        const Option& option,
+        const MarketData& marketData,
+        PricingModel model,
+        NumericalMethod method
+    ) const {
+        // Check compatibility
+        if (!option.getPayoff().isCompatible(model, method)) {
+            auto compatible = getCompatibleCombinations(option);
 
-            if (compatibleTypes.empty()) {
-                error += "none available";
-            } else {
-                for (size_t i = 0; i < compatibleTypes.size(); ++i) {
-                    error += modelTypeToString(compatibleTypes[i]);
-                    if (i < compatibleTypes.size() - 1) error += ", ";
+            std::string error = "Cannot price " + option.getPayoff().getName() +
+                              " with " + toString(model) + " + " + toString(method);
+
+            if (!compatible.empty()) {
+                error += "\n\nCompatible combinations:";
+                for (const auto& pair : compatible) {
+                    error += "\n  - " + toString(pair);
                 }
+            } else {
+                error += "\n\nNo compatible combinations available.";
             }
 
-            return PricingResult(error, modelTypeToString(modelType));
+            return PricingResult(error, toString(model) + "+" + toString(method));
         }
 
-        // Find model creator
-        auto creatorIt = modelCreators_.find(modelType);
-        if (creatorIt == modelCreators_.end()) {
-            return PricingResult("Model not registered: " + modelTypeToString(modelType),
-                               modelTypeToString(modelType));
+        // Find implementation
+        ModelMethodPair key{model, method};
+        auto it = implementations_.find(key);
+
+        if (it == implementations_.end()) {
+            return PricingResult(
+                "No implementation registered for " + toString(key),
+                toString(key)
+            );
         }
 
-        // Create and use model
+        // Create and execute
         try {
-            auto model = creatorIt->second();
-            return model->price(option, marketData);
+            auto implementation = it->second();
+            return implementation->price(option, marketData);
         } catch (const std::exception& e) {
-            return PricingResult(std::string("Pricing error: ") + e.what(),
-                               modelTypeToString(modelType));
+            return PricingResult(
+                std::string("Pricing error: ") + e.what(),
+                toString(key)
+            );
         }
     }
 
-    // *** SECONDARY METHOD: String delegation ***
-    PricingResult PricingEngine::price(const Option& option, const MarketData& marketData, const std::string& modelName) const {
+    PricingResult PricingEngine::price(
+        const Option& option,
+        const MarketData& marketData,
+        const std::string& modelName,
+        const std::string& methodName
+    ) const {
         try {
-            ModelType modelType = stringToModelType(modelName);
-            return price(option, marketData, modelType);  // Delegate to type-safe method
+            PricingModel model = stringToPricingModel(modelName);
+            NumericalMethod method = stringToNumericalMethod(methodName);
+            return price(option, marketData, model, method);
         } catch (const std::exception& e) {
-            return PricingResult("Invalid model name '" + modelName + "': " + e.what(), modelName);
+            return PricingResult(
+                std::string("Invalid model/method: ") + e.what(),
+                modelName + "+" + methodName
+            );
         }
     }
 
-    // *** TYPE-SAFE QUERY METHODS ***
-    std::vector<ModelType> PricingEngine::getCompatibleModelTypes(const Option& option) const {
-        return option.getPayoff().getCompatibleModels();
+    std::vector<ModelMethodPair> PricingEngine::getCompatibleCombinations(
+        const Option& option
+    ) const {
+        return option.getPayoff().getCompatibleCombinations();
     }
 
-    std::vector<ModelType> PricingEngine::getAllModelTypes() const {
-        std::vector<ModelType> types;
-        types.reserve(modelCreators_.size());
+    bool PricingEngine::isCompatible(
+        const Option& option,
+        PricingModel model,
+        NumericalMethod method
+    ) const {
+        return option.getPayoff().isCompatible(model, method);
+    }
 
-        for (const auto& [type, creator] : modelCreators_) {
-            types.push_back(type);
+    std::vector<ModelMethodPair> PricingEngine::getAllRegisteredCombinations() const {
+        std::vector<ModelMethodPair> combinations;
+        combinations.reserve(implementations_.size());
+
+        for (const auto& [pair, creator] : implementations_) {
+            combinations.push_back(pair);
         }
 
-        return types;
+        return combinations;
     }
 
-    // *** STRING QUERY METHODS (convert from ModelType) ***
-    std::vector<std::string> PricingEngine::getCompatibleModels(const Option& option) const {
-        auto types = getCompatibleModelTypes(option);
-        std::vector<std::string> names;
-        names.reserve(types.size());
-
-        for (ModelType type : types) {
-            // Only include models we actually have registered
-            if (modelCreators_.find(type) != modelCreators_.end()) {
-                names.push_back(modelTypeToString(type));
-            }
-        }
-
-        return names;
+    void PricingEngine::registerImplementation(
+        PricingModel model,
+        NumericalMethod method,
+        std::function<std::unique_ptr<PricingImplementation>()> creator
+    ) {
+        implementations_[{model, method}] = std::move(creator);
     }
 
-    std::vector<std::string> PricingEngine::getAllModels() const {
-        auto types = getAllModelTypes();
-        std::vector<std::string> names;
-        names.reserve(types.size());
-
-        for (ModelType type : types) {
-            names.push_back(modelTypeToString(type));
-        }
-
-        return names;
-    }
-
-    // *** REGISTRATION METHOD ***
-    void PricingEngine::registerModel(ModelType type, std::function<std::unique_ptr<PricingModel>()> creator) {
-        modelCreators_[type] = std::move(creator);
-    }
-
-    // *** DEFAULT MODELS REGISTRATION ***
-    void PricingEngine::registerDefaultModels() {
-        registerModel(ModelType::BLACK_SCHOLES,
-                     []() { return std::make_unique<BlackScholesModel>(); });
-
-        // Add more models as they're implemented:
-        // registerModel(ModelType::MONTE_CARLO,
-        //              []() { return std::make_unique<MonteCarloModel>(); });
-    }
-
-    // *** STATIC CONVERSION METHODS ***
-    std::string PricingEngine::modelTypeToString(ModelType type) {
-        switch (type) {
-            case ModelType::BLACK_SCHOLES: return "blackscholes";
-            case ModelType::BLACK_SCHOLES_MERTON: return "blackscholesmerton";
-            case ModelType::BINOMIAL_TREE: return "binomialtree";
-            case ModelType::MONTE_CARLO: return "montecarlo";
-            default:
-                throw std::invalid_argument("Unknown ModelType: " + std::to_string(static_cast<int>(type)));
-        }
-    }
-
-    ModelType PricingEngine::stringToModelType(const std::string& name) {
-        if (name == "blackscholes") return ModelType::BLACK_SCHOLES;
-        if (name == "blackscholesmerton") return ModelType::BLACK_SCHOLES_MERTON;
-        if (name == "binomialtree") return ModelType::BINOMIAL_TREE;
-        if (name == "montecarlo") return ModelType::MONTE_CARLO;
-
-        throw std::invalid_argument("Unknown model name: " + name);
+    void PricingEngine::registerDefaultImplementations() {
+        // Black-Scholes + Analytical
+        registerImplementation(
+            PricingModel::BLACK_SCHOLES,
+            NumericalMethod::ANALYTICAL,
+            []() { return std::make_unique<BlackScholesAnalytical>(); }
+        );
     }
 }

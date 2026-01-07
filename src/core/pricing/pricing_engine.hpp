@@ -1,7 +1,9 @@
 #pragma once
-#include "pricing_model.hpp"
+#include "pricing_implementation.hpp"
 #include "pricing_result.hpp"
-#include "../enums/model_types.hpp"
+#include "../enums/pricing_models.hpp"
+#include "../enums/numerical_methods.hpp"
+#include "../enums/model_method_pair.hpp"
 #include "../market_data/market_data.hpp"
 #include <functional>
 #include <unordered_map>
@@ -9,49 +11,52 @@
 namespace pricing {
 
     class PricingEngine {
-    public:
-        PricingEngine();
+public:
+    PricingEngine();
 
-        // *** PRIMARY API: ModelType enum (type-safe) ***
-        PricingResult price(
-            const Option& option,
-            const MarketData& marketData,
-            ModelType modelType) const;
+    // PRIMARY API: Type-safe with separate model and method
+    PricingResult price(
+        const Option& option,
+        const MarketData& marketData,
+        PricingModel model,
+        NumericalMethod method
+    ) const;
 
-        // *** SECONDARY API: String (JSON compatibility) ***
-        PricingResult price(
-            const Option& option,
-            const MarketData& marketData,
-            const std::string& modelName) const;
+    // SECONDARY API: String-based (for JSON/HTTP)
+    PricingResult price(
+        const Option& option,
+        const MarketData& marketData,
+        const std::string& modelName,
+        const std::string& methodName
+    ) const;
 
-        // *** TYPE-SAFE QUERIES ***
-        std::vector<ModelType> getCompatibleModelTypes(const Option& option) const;  // Fixed typo
-        std::vector<ModelType> getAllModelTypes() const;  // Fixed typo
+    // Query compatibility
+    std::vector<ModelMethodPair> getCompatibleCombinations(
+        const Option& option
+    ) const;
 
-        // *** STRING QUERIES (for JSON) ***
-        std::vector<std::string> getCompatibleModels(const Option& option) const;
-        std::vector<std::string> getAllModels() const;
+    bool isCompatible(
+        const Option& option,
+        PricingModel model,
+        NumericalMethod method
+    ) const;
 
-        // *** REGISTRATION: Use ModelType directly ***
-        void registerModel(
-            ModelType type,
-            std::function<std::unique_ptr<PricingModel>()> creator);
+    std::vector<ModelMethodPair> getAllRegisteredCombinations() const;
 
-        // *** STATIC CONVERSION UTILITIES ***
-        static std::string modelTypeToString(ModelType type);
-        static ModelType stringToModelType(const std::string& name);
+    // Registration
+    void registerImplementation(
+        PricingModel model,
+        NumericalMethod method,
+        std::function<std::unique_ptr<PricingImplementation>()> creator
+    );
 
-    private:
-        // *** SIMPLIFIED: Only need one map with ModelType as key ***
-        std::unordered_map<ModelType, std::function<std::unique_ptr<PricingModel>()>> modelCreators_;
+private:
+    std::unordered_map<
+        ModelMethodPair,
+        std::function<std::unique_ptr<PricingImplementation>()>,
+        ModelMethodPairHash
+    > implementations_;
 
-        void registerDefaultModels();
-
-        // Custom hash for ModelType enum
-        struct ModelTypeHash {
-            std::size_t operator()(ModelType type) const {
-                return static_cast<std::size_t>(type);
-            }
-        };
-    };
+    void registerDefaultImplementations();
+};
 }
